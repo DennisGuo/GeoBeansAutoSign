@@ -239,11 +239,6 @@ public class CalendarHelp {
 		return 0;
 	}
 	
-	public static void main(String[] args) {
-		String ss = CalendarHelp.getDataTimeStr();
-		System.out.println(ss);
-	}
-	
 	/**
 	 * 将字符串的时间转换为Date对象
 	 * @param dateString	时间字符串
