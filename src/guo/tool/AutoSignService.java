@@ -1,9 +1,11 @@
 package guo.tool;
 
-import java.io.File;
-import java.io.FileInputStream;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Calendar;
 import java.util.Date;
@@ -11,6 +13,7 @@ import java.util.GregorianCalendar;
 import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
+import javax.swing.text.TabableView;
 
 public class AutoSignService extends TimerTask {
 
@@ -27,6 +30,7 @@ public class AutoSignService extends TimerTask {
 	 */
 	private void doSign(Properties pro) {
 		String urlStr = pro.getProperty("sign.url");
+		String frameUrl = pro.getProperty("sign.frame.url");
 		String user = pro.getProperty("sign.username");
 		String pwd = pro.getProperty("sign.password");
 		String postKV = "username="+user+"&password="+pwd;
@@ -34,18 +38,61 @@ public class AutoSignService extends TimerTask {
 			URL url = new URL(urlStr);
 			HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 			conn.setDoOutput(true);
+			conn.setDoInput(true);
 			conn.setRequestMethod("POST");
+			
 			OutputStream out = conn.getOutputStream();
 			out.write(postKV.getBytes());
 			out.flush();
-			out.close();
+			
+			String session_value=conn.getHeaderField("Set-Cookie");
+			System.out.println("---Session value : "+session_value);
+			String sessionKV = session_value.split(";")[0];
+			System.out.println("---Session kv : "+sessionKV);
+			
+			this.doGetResultRequest(frameUrl,sessionKV);
+			
 			int status = conn.getResponseCode();
-			System.out.println("---AutoSign Executed // Username:"+user+" Password:"+pwd+" Response:"+status+"  ["+CalendarHelp.getDataTimeStr()+"]");
+			conn.disconnect();
+			System.out.println("---AutoSign Executed // Username:"+user+" Password:"+pwd+" Response:"+status+" // "+CalendarHelp.getDataTimeStr());
 			System.out.println(":)");
+			
+			out.close();
 			
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * 获取登录成功后，Frame加载结果项
+	 * @throws Exception 
+	 */
+	private void doGetResultRequest(String frameUrl,String sessionKV) throws Exception {
+		URL url = new URL(frameUrl);
+		HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+		conn.setDoInput(true);
+		conn.setRequestMethod("GET");
+		conn.setRequestProperty("Cookie", sessionKV);
+		InputStream in = conn.getInputStream();
+		BufferedReader bf = new BufferedReader(new InputStreamReader(in,"gb2312"));
+		String line = null;
+		StringBuilder rs = new StringBuilder();
+		while((line=bf.readLine())!=null){
+			rs.append(line);
+		}
+		bf.close();
+		in.close();
+		String s = rs.toString().replace("\"", "\'");
+		String tag = "签到时间为：";
+		int index = s.indexOf(tag);
+		if(index>=0){
+			String out = s.substring(index,index+tag.length()+8);
+			System.out.println("---System response : "+ out + " // "+CalendarHelp.getDataTimeStr());
+		}else{
+			System.out.println(s);
+		}
+		
 	}
 
 	/**
@@ -54,8 +101,14 @@ public class AutoSignService extends TimerTask {
 	 */
 	public static Properties getProperty() {
 		try {
-			File file = new File("resources/application.properties");
-			FileInputStream in = new FileInputStream(file);
+//			String filePath = "resources/application.properties";
+//			System.out.println("---Config file: "+filePath);
+//			File file = new File(filePath);
+//			if(!file.exists()){
+//				file.createNewFile();
+//				System.out.println("---Create file: "+filePath);
+//			}			
+			InputStream in = AutoSignService.class.getResourceAsStream("/application.properties"); //new FileInputStream(file);
 			Properties pro = new Properties();
 			pro.load(in);
 			return pro;
@@ -65,6 +118,12 @@ public class AutoSignService extends TimerTask {
 		return null;
 	}
 
+	/*
+	public static void main(String[] args){
+		new AutoSignService().run();
+	}
+	*/
+	
 	/**
 	 * @param args
 	 */
@@ -72,12 +131,12 @@ public class AutoSignService extends TimerTask {
 		try {
 			System.out.println("-------------------------------------------");
 			System.out.println("---GeoBeansAutoSign Fired");
-			System.out.println("---Written by guohengxi.dennis@gmail.com");
-			System.out.println("---Vsersion beta 0.1");
+			System.out.println("---Author: guohengxi.dennis@gmail.com");
+			System.out.println("---Vsersion: final 0.1");
 			System.out.println("-------------------------------------------");
 			Properties pro = getProperty();
 			String user = pro.getProperty("sign.username");
-			System.out.println("---Username to sign :"+user+"  ["+CalendarHelp.getDataTimeStr()+"]");
+			System.out.println("---Username to sign : "+user+"  // "+CalendarHelp.getDataTimeStr());
 			
 			Timer timer = new Timer();
 			
@@ -93,7 +152,7 @@ public class AutoSignService extends TimerTask {
 				cal.setTime(firstTime);
 				cal.add(Calendar.DATE, 1);
 				firstTime = cal.getTime();
-				System.out.println("---Delay, the next time to sign at ："+CalendarHelp.getMonitorTimeStr(firstTime)+"  ["+CalendarHelp.getDataTimeStr()+"]");
+				System.out.println("---Delay, the next time to sign at ： "+CalendarHelp.getMonitorTimeStr(firstTime)+"  // "+CalendarHelp.getDataTimeStr());
 			}
 			
 			long period = 1000*60*60*24;//24小时
@@ -102,5 +161,5 @@ public class AutoSignService extends TimerTask {
 			e.printStackTrace();
 		}
 	}
-
+	
 }
